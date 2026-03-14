@@ -1,0 +1,106 @@
+# ============================================================
+# Security Test Integration Framework — Configuration
+# ============================================================
+
+# Target application settings
+target:
+  base_url: "${TARGET_URL:-http://localhost:8080}"
+  timeout_seconds: 15
+  verify_ssl: false
+  auth:
+    test_user_email: "testuser@example.com"
+    test_user_password: "${TEST_USER_PASSWORD:-TestPassword123!}"
+    admin_email: "admin@example.com"
+
+# Selenium WebDriver settings
+selenium:
+  headless: "${HEADLESS:-true}"
+  browser: "chrome"
+  window_size: "1920x1080"
+  page_load_timeout: 15
+  implicit_wait: 5
+  chrome_args:
+    - "--no-sandbox"
+    - "--disable-dev-shm-usage"
+    - "--disable-gpu"
+
+# Test suite configuration
+test_suites:
+  xss:
+    enabled: true
+    max_payloads_per_type: 3
+    test_reflected: true
+    test_stored: true
+    test_dom: true
+    check_csp: true
+    severity: HIGH
+
+  sql_injection:
+    enabled: true
+    time_based_threshold_seconds: 2.5
+    test_login_forms: true
+    test_error_disclosure: true
+    test_time_based: true
+    test_boolean_blind: true
+    severity: CRITICAL
+
+  authentication:
+    enabled: true
+    brute_force_attempts: 10
+    test_lockout: true
+    test_session_fixation: true
+    test_account_enumeration: true
+    test_password_policy: true
+    test_cookie_flags: true
+    severity: HIGH
+
+  csrf_and_headers:
+    enabled: true
+    required_headers:
+      - X-Content-Type-Options
+      - X-Frame-Options
+      - Strict-Transport-Security
+      - Referrer-Policy
+      - Permissions-Policy
+    test_cors: true
+    test_clickjacking: true
+    severity: MEDIUM
+
+# Reporting
+reporting:
+  output_dir: "reports"
+  results_json: "reports/security_results.json"
+  html_report: "reports/security_report.html"
+  junit_xml: "reports/junit_results.xml"
+  log_level: "INFO"
+
+# Jenkins thresholds
+thresholds:
+  fail_on_critical: true
+  fail_on_high: true
+  fail_on_warnings: false
+  max_medium_findings: 5
+  max_low_findings: 10
+
+# Exclusions — paths/patterns to skip
+exclusions:
+  url_patterns:
+    - "/static/*"
+    - "/media/*"
+    - "/favicon.ico"
+  test_names:
+    []  # Add specific test names to skip
+
+# Notifications
+notifications:
+  slack:
+    enabled: "${SLACK_ENABLED:-false}"
+    channel: "${SLACK_CHANNEL:-#security-alerts}"
+    notify_on:
+      - FAIL
+      - CRITICAL
+  email:
+    enabled: "${EMAIL_ENABLED:-false}"
+    recipients: "${EMAIL_RECIPIENTS:-}"
+    notify_on:
+      - FAIL

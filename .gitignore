@@ -1,0 +1,48 @@
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# Test reports (generated at runtime)
+reports/security_results.json
+reports/security_report.html
+reports/pytest_report.html
+reports/junit_results.xml
+reports/*.log
+reports/xss_junit.xml
+reports/sqli_junit.xml
+reports/auth_junit.xml
+reports/csrf_junit.xml
+
+# Keep the reports directory itself
+!reports/.gitkeep
+
+# Pytest cache
+.pytest_cache/
+.cache/
+
+# Environment / secrets
+.env
+.env.*
+*.secret
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+security_test.log
