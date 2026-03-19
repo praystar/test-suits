@@ -97,6 +97,22 @@ class BaseSecurityTest(unittest.TestCase):
             chromedriver_path = os.getenv("CHROMEDRIVER")
             chrome_binary = os.getenv("CHROME_BIN")
             
+            # If no custom binary specified, try common locations
+            if not chrome_binary:
+                common_paths = [
+                    "/usr/bin/chromium-browser",      # Linux (Chromium)
+                    "/usr/bin/chromium",              # Linux (Chromium alt)
+                    "/usr/bin/google-chrome",         # Linux (Google Chrome)
+                    "/usr/bin/google-chrome-stable",  # Linux (Google Chrome stable)
+                    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",  # macOS
+                    "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",     # Windows
+                ]
+                for path in common_paths:
+                    if os.path.exists(path):
+                        chrome_binary = path
+                        cls.logger.info(f"Using Chrome binary: {chrome_binary}")
+                        break
+            
             if chrome_binary:
                 chrome_options.binary_location = chrome_binary
             
