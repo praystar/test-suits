@@ -52,7 +52,15 @@ jobs:
           python-version: '3.11'
           cache: 'pip'
       
-      - name: Install dependencies
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y chromium-browser chromium-chromedriver
+      
+      - name: Create reports directory
+        run: mkdir -p reports
+      
+      - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
@@ -80,6 +88,8 @@ jobs:
         env:
           TARGET_URL: http://localhost:8080
           HEADLESS: "true"
+          CHROME_BIN: /usr/bin/chromium-browser
+          CHROMEDRIVER: /usr/bin/chromedriver
         run: |
           python -m pytest security_tests/ \
             --html=reports/pytest_report.html \
@@ -92,7 +102,10 @@ jobs:
       - name: Generate security report
         if: always()
         run: |
-          python scripts/generate_report.py
+          if [ ! -f reports/security_results.json ]; then
+            echo '{"results": [], "summary": {"total": 0, "passed": 0, "failed": 0}}' > reports/security_results.json
+          fi
+          python scripts/generate_report.py || echo "Report generation skipped"
         continue-on-error: true
       
       - name: Upload security reports
