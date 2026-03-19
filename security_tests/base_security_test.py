@@ -89,9 +89,22 @@ class BaseSecurityTest(unittest.TestCase):
         # Security-relevant options
         chrome_options.add_argument("--disable-web-security")
         chrome_options.add_argument("--allow-running-insecure-content")
+        chrome_options.add_argument("--disable-blink-features=AutomationControlled")
+        chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
 
         try:
-            cls.driver = webdriver.Chrome(options=chrome_options)
+            # Try custom paths first, then fall back to auto-detection
+            chromedriver_path = os.getenv("CHROMEDRIVER")
+            chrome_binary = os.getenv("CHROME_BIN")
+            
+            if chrome_binary:
+                chrome_options.binary_location = chrome_binary
+            
+            if chromedriver_path and os.path.exists(chromedriver_path):
+                cls.driver = webdriver.Chrome(service=Service(chromedriver_path), options=chrome_options)
+            else:
+                cls.driver = webdriver.Chrome(options=chrome_options)
+            
             cls.driver.set_page_load_timeout(cls.TIMEOUT)
             cls.wait = WebDriverWait(cls.driver, cls.TIMEOUT)
             cls.logger.info("WebDriver initialized successfully")
