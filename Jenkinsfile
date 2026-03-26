@@ -4,16 +4,7 @@
 // ============================================================
 
 pipeline {
-    agent {
-        docker {
-            image 'python:3.12-slim'
-            args '''
-                --shm-size=2g
-                -v /dev/shm:/dev/shm
-                -e DISPLAY=:99
-            '''
-        }
-    }
+    agent any
 
     // ─── Pipeline Parameters ────────────────────────────────
     parameters {
@@ -62,7 +53,6 @@ pipeline {
         timeout(time: 45, unit: 'MINUTES')
         timestamps()
         buildDiscarder(logRotator(numToKeepStr: '30'))
-        ansiColor('xterm')
     }
 
     stages {
@@ -72,19 +62,35 @@ pipeline {
             steps {
                 echo "🔧 Setting up security test environment..."
                 sh '''
-                    apt-get update -qq
-                    apt-get install -y -qq \
-                        wget \
-                        gnupg \
-                        unzip \
-                        xvfb \
-                        libglib2.0-0 \
-                        libnss3 \
-                        libgconf-2-4 \
-                        libfontconfig1 \
-                        chromium \
-                        chromium-driver \
-                        2>/dev/null
+                    set +e
+
+                    # Install browser/runtime deps only when apt is available and permitted.
+                    if command -v apt-get >/dev/null 2>&1; then
+                        SUDO=""
+                        if [ "$(id -u)" -ne 0 ] && command -v sudo >/dev/null 2>&1; then
+                            SUDO="sudo"
+                        fi
+
+                        if [ "$(id -u)" -eq 0 ] || [ -n "$SUDO" ]; then
+                            $SUDO apt-get update -qq
+                            $SUDO apt-get install -y -qq \
+                                wget \
+                                gnupg \
+                                unzip \
+                                xvfb \
+                                libglib2.0-0 \
+                                libnss3 \
+                                libgconf-2-4 \
+                                libfontconfig1 \
+                                chromium \
+                                chromium-driver \
+                                2>/dev/null || true
+                        else
+                            echo "WARN: apt-get found but no root/sudo permissions; skipping OS package install"
+                        fi
+                    else
+                        echo "INFO: apt-get not found; assuming browser/runtime dependencies already exist"
+                    fi
 
                     echo "Chrome version: $(chromium --version 2>/dev/null || echo 'not found')"
                     echo "ChromeDriver version: $(chromedriver --version 2>/dev/null || echo 'not found')"
@@ -168,7 +174,13 @@ pipeline {
             }
             post {
                 always {
-                    junit allowEmptyResults: true, testResults: 'reports/xss_junit.xml'
+                    script {
+                        try {
+                            junit allowEmptyResults: true, testResults: 'reports/xss_junit.xml'
+                        } catch (Exception err) {
+                            echo "WARN: Unable to publish JUnit results (plugin may be missing): ${err.message}"
+                        }
+                    }
                 }
             }
         }
@@ -201,7 +213,13 @@ pipeline {
             }
             post {
                 always {
-                    junit allowEmptyResults: true, testResults: 'reports/sqli_junit.xml'
+                    script {
+                        try {
+                            junit allowEmptyResults: true, testResults: 'reports/sqli_junit.xml'
+                        } catch (Exception err) {
+                            echo "WARN: Unable to publish JUnit results (plugin may be missing): ${err.message}"
+                        }
+                    }
                 }
             }
         }
@@ -234,7 +252,13 @@ pipeline {
             }
             post {
                 always {
-                    junit allowEmptyResults: true, testResults: 'reports/auth_junit.xml'
+                    script {
+                        try {
+                            junit allowEmptyResults: true, testResults: 'reports/auth_junit.xml'
+                        } catch (Exception err) {
+                            echo "WARN: Unable to publish JUnit results (plugin may be missing): ${err.message}"
+                        }
+                    }
                 }
             }
         }
@@ -267,7 +291,13 @@ pipeline {
             }
             post {
                 always {
-                    junit allowEmptyResults: true, testResults: 'reports/csrf_junit.xml'
+                    script {
+                        try {
+                            junit allowEmptyResults: true, testResults: 'reports/csrf_junit.xml'
+                        } catch (Exception err) {
+                            echo "WARN: Unable to publish JUnit results (plugin may be missing): ${err.message}"
+                        }
+                    }
                 }
             }
         }
@@ -328,34 +358,46 @@ pipeline {
                 fingerprint: true
             )
 
-            publishHTML(target: [
-                allowMissing: true,
-                alwaysLinkToLastBuild: true,
-                keepAll: true,
-                reportDir: 'reports',
-                reportFiles: 'security_report.html',
-                reportName: 'Security Test Report',
-                reportTitles: 'Security Test Results'
-            ])
+            script {
+                try {
+                    publishHTML(target: [
+                        allowMissing: true,
+                        alwaysLinkToLastBuild: true,
+                        keepAll: true,
+                        reportDir: 'reports',
+                        reportFiles: 'security_report.html',
+                        reportName: 'Security Test Report',
+                        reportTitles: 'Security Test Results'
+                    ])
+                } catch (Exception err) {
+                    echo "WARN: Unable to publish HTML report (HTML Publisher plugin may be missing): ${err.message}"
+                }
+            }
         }
 
         failure {
             echo "🚨 Security tests FAILED — notifying team"
-            emailext(
-                subject: "[SECURITY] Build #${BUILD_NUMBER} — Vulnerabilities Found — ${TARGET_URL}",
-                body: """
-                    Security test suite has detected vulnerabilities.
+            script {
+                try {
+                    emailext(
+                        subject: "[SECURITY] Build #${BUILD_NUMBER} — Vulnerabilities Found — ${TARGET_URL}",
+                        body: """
+                            Security test suite has detected vulnerabilities.
 
-                    Build:  #${BUILD_NUMBER}
-                    Target: ${TARGET_URL}
-                    Result: ${currentBuild.result}
-                    URL:    ${BUILD_URL}
+                            Build:  #${BUILD_NUMBER}
+                            Target: ${TARGET_URL}
+                            Result: ${currentBuild.result}
+                            URL:    ${BUILD_URL}
 
-                    Please review the attached security report immediately.
-                """,
-                to: '${DEFAULT_RECIPIENTS}',
-                attachmentsPattern: 'reports/security_report.html'
-            )
+                            Please review the attached security report immediately.
+                        """,
+                        to: '${DEFAULT_RECIPIENTS}',
+                        attachmentsPattern: 'reports/security_report.html'
+                    )
+                } catch (Exception err) {
+                    echo "WARN: Unable to send email notification (Email Extension plugin may be missing): ${err.message}"
+                }
+            }
         }
 
         unstable {
@@ -368,7 +410,13 @@ pipeline {
 
         cleanup {
             sh 'pkill -f "Xvfb" 2>/dev/null || true'
-            cleanWs()
+            script {
+                try {
+                    cleanWs()
+                } catch (Exception err) {
+                    echo "WARN: Unable to clean workspace (Workspace Cleanup plugin may be missing): ${err.message}"
+                }
+            }
         }
     }
 }
