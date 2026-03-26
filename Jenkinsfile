@@ -47,6 +47,7 @@ pipeline {
         SELENIUM_TIMEOUT = "15"
         PYTHONDONTWRITEBYTECODE = "1"
         PIP_CACHE_DIR   = ".pip-cache"
+        VENV_DIR        = ".venv-ci"
     }
 
     // ─── Pipeline Options ────────────────────────────────────
@@ -117,13 +118,16 @@ pipeline {
                     fi
 
                     mkdir -p "${PIP_CACHE_DIR}"
-                    "$PYTHON_BIN" -m pip install --quiet --disable-pip-version-check --upgrade pip
-                    "$PYTHON_BIN" -m pip install --quiet --disable-pip-version-check \
+
+                    # Use an isolated virtualenv to avoid system/Homebrew Python restrictions.
+                    "$PYTHON_BIN" -m venv "${VENV_DIR}"
+                    "${VENV_DIR}/bin/python" -m pip install --quiet --disable-pip-version-check --upgrade pip
+                    "${VENV_DIR}/bin/python" -m pip install --quiet --disable-pip-version-check \
                         --cache-dir "${PIP_CACHE_DIR}" \
                         -r requirements.txt
 
                     echo "✅ Dependencies installed"
-                    "$PYTHON_BIN" -c "import selenium; print(f'Selenium: {selenium.__version__}')"
+                    "${VENV_DIR}/bin/python" -c "import selenium; print(f'Selenium: {selenium.__version__}')"
                 '''
 
                 sh 'mkdir -p ${REPORT_DIR}'
@@ -174,7 +178,7 @@ pipeline {
                     Xvfb :99 -screen 0 1920x1080x24 &
                     XVFB_PID=$!
 
-                    python -m pytest \
+                    ${VENV_DIR}/bin/python -m pytest \
                         security_tests/xss_tests.py \
                         -v \
                         --tb=short \
@@ -214,7 +218,7 @@ pipeline {
                     Xvfb :99 -screen 0 1920x1080x24 &
                     XVFB_PID=$!
 
-                    python -m pytest \
+                    ${VENV_DIR}/bin/python -m pytest \
                         security_tests/sql_injection_tests.py \
                         -v \
                         --tb=short \
@@ -253,7 +257,7 @@ pipeline {
                     Xvfb :99 -screen 0 1920x1080x24 &
                     XVFB_PID=$!
 
-                    python -m pytest \
+                    ${VENV_DIR}/bin/python -m pytest \
                         security_tests/auth_tests.py \
                         -v \
                         --tb=short \
@@ -292,7 +296,7 @@ pipeline {
                     Xvfb :99 -screen 0 1920x1080x24 &
                     XVFB_PID=$!
 
-                    python -m pytest \
+                    ${VENV_DIR}/bin/python -m pytest \
                         security_tests/csrf_and_headers_tests.py \
                         -v \
                         --tb=short \
@@ -322,7 +326,7 @@ pipeline {
             steps {
                 echo "📊 Generating consolidated security report..."
                 sh '''
-                    python scripts/generate_report.py \
+                    ${VENV_DIR}/bin/python scripts/generate_report.py \
                         --results ${RESULTS_FILE} \
                         --output ${HTML_REPORT} \
                         --build-url "${BUILD_URL}" \
@@ -340,7 +344,7 @@ pipeline {
                 script {
                     def exitCode = sh(
                         script: '''
-                            python scripts/evaluate_thresholds.py \
+                            ${VENV_DIR}/bin/python scripts/evaluate_thresholds.py \
                                 --results ${RESULTS_FILE} \
                                 --fail-on-critical true \
                                 --fail-on-high true \
