@@ -109,14 +109,21 @@ pipeline {
                 '''
 
                 sh '''
+                    set -e
+                    PYTHON_BIN="$(command -v python || command -v python3 || true)"
+                    if [ -z "$PYTHON_BIN" ]; then
+                        echo "ERROR: Neither python nor python3 is available on this Jenkins agent"
+                        exit 1
+                    fi
+
                     mkdir -p "${PIP_CACHE_DIR}"
-                    python -m pip install --quiet --disable-pip-version-check --upgrade pip
-                    python -m pip install --quiet --disable-pip-version-check \
+                    "$PYTHON_BIN" -m pip install --quiet --disable-pip-version-check --upgrade pip
+                    "$PYTHON_BIN" -m pip install --quiet --disable-pip-version-check \
                         --cache-dir "${PIP_CACHE_DIR}" \
                         -r requirements.txt
 
                     echo "✅ Dependencies installed"
-                    python -c "import selenium; print(f'Selenium: {selenium.__version__}')"
+                    "$PYTHON_BIN" -c "import selenium; print(f'Selenium: {selenium.__version__}')"
                 '''
 
                 sh 'mkdir -p ${REPORT_DIR}'
