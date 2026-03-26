@@ -46,6 +46,7 @@ pipeline {
         JUNIT_REPORT    = "reports/junit_results.xml"
         SELENIUM_TIMEOUT = "15"
         PYTHONDONTWRITEBYTECODE = "1"
+        PIP_CACHE_DIR   = ".pip-cache"
     }
 
     // ─── Pipeline Options ────────────────────────────────────
@@ -64,32 +65,43 @@ pipeline {
                 sh '''
                     set +e
 
-                    # Install browser/runtime deps only when apt is available and permitted.
-                    if command -v apt-get >/dev/null 2>&1; then
-                        SUDO=""
-                        if [ "$(id -u)" -ne 0 ] && command -v sudo >/dev/null 2>&1; then
-                            SUDO="sudo"
-                        fi
+                    HAS_BROWSER_DEPS="false"
+                    if command -v chromium >/dev/null 2>&1 && \
+                       command -v chromedriver >/dev/null 2>&1 && \
+                       command -v Xvfb >/dev/null 2>&1; then
+                        HAS_BROWSER_DEPS="true"
+                    fi
 
-                        if [ "$(id -u)" -eq 0 ] || [ -n "$SUDO" ]; then
-                            $SUDO apt-get update -qq
-                            $SUDO apt-get install -y -qq \
-                                wget \
-                                gnupg \
-                                unzip \
-                                xvfb \
-                                libglib2.0-0 \
-                                libnss3 \
-                                libgconf-2-4 \
-                                libfontconfig1 \
-                                chromium \
-                                chromium-driver \
-                                2>/dev/null || true
+                    # Install browser/runtime deps only when missing.
+                    if [ "$HAS_BROWSER_DEPS" = "false" ]; then
+                        if command -v apt-get >/dev/null 2>&1; then
+                            SUDO=""
+                            if [ "$(id -u)" -ne 0 ] && command -v sudo >/dev/null 2>&1; then
+                                SUDO="sudo"
+                            fi
+
+                            if [ "$(id -u)" -eq 0 ] || [ -n "$SUDO" ]; then
+                                $SUDO apt-get update -qq
+                                $SUDO apt-get install -y -qq \
+                                    wget \
+                                    gnupg \
+                                    unzip \
+                                    xvfb \
+                                    libglib2.0-0 \
+                                    libnss3 \
+                                    libgconf-2-4 \
+                                    libfontconfig1 \
+                                    chromium \
+                                    chromium-driver \
+                                    2>/dev/null || true
+                            else
+                                echo "WARN: apt-get found but no root/sudo permissions; skipping OS package install"
+                            fi
                         else
-                            echo "WARN: apt-get found but no root/sudo permissions; skipping OS package install"
+                            echo "INFO: apt-get not found; assuming browser/runtime dependencies already exist"
                         fi
                     else
-                        echo "INFO: apt-get not found; assuming browser/runtime dependencies already exist"
+                        echo "INFO: Browser dependencies already present, skipping apt install"
                     fi
 
                     echo "Chrome version: $(chromium --version 2>/dev/null || echo 'not found')"
@@ -97,15 +109,11 @@ pipeline {
                 '''
 
                 sh '''
-                    pip install --quiet --upgrade pip
-                    pip install --quiet \
-                        selenium>=4.18.0 \
-                        requests>=2.31.0 \
-                        pytest>=8.0.0 \
-                        pytest-html>=4.1.0 \
-                        pytest-json-report>=1.5.0 \
-                        junit-xml>=1.9 \
-                        colorlog>=6.8.0
+                    mkdir -p "${PIP_CACHE_DIR}"
+                    python -m pip install --quiet --disable-pip-version-check --upgrade pip
+                    python -m pip install --quiet --disable-pip-version-check \
+                        --cache-dir "${PIP_CACHE_DIR}" \
+                        -r requirements.txt
 
                     echo "✅ Dependencies installed"
                     python -c "import selenium; print(f'Selenium: {selenium.__version__}')"
