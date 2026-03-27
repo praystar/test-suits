@@ -10,8 +10,12 @@ import time
 import os
 from datetime import datetime, timezone
 from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options as ChromeOptions
+from selenium.webdriver.chrome.service import Service as ChromeService
+from selenium.webdriver.firefox.options import Options as FirefoxOptions
+from selenium.webdriver.firefox.service import Service as FirefoxService
+from selenium.webdriver.edge.options import Options as EdgeOptions
+from selenium.webdriver.edge.service import Service as EdgeService
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
@@ -66,6 +70,7 @@ class BaseSecurityTest(unittest.TestCase):
 
     BASE_URL = os.getenv("TARGET_URL", "http://localhost:8080")
     HEADLESS = os.getenv("HEADLESS", "true").lower() == "true"
+    BROWSER = os.getenv("BROWSER", "chrome").lower()
     TIMEOUT = int(os.getenv("SELENIUM_TIMEOUT", "10"))
     RESULTS_FILE = "reports/security_results.json"
 
@@ -79,48 +84,101 @@ class BaseSecurityTest(unittest.TestCase):
         cls.logger.info(f"Setting up security test suite: {cls.__name__}")
         cls.results = []
 
-        chrome_options = Options()
-        if cls.HEADLESS:
-            chrome_options.add_argument("--headless=new")
-        chrome_options.add_argument("--no-sandbox")
-        chrome_options.add_argument("--disable-dev-shm-usage")
-        chrome_options.add_argument("--disable-gpu")
-        chrome_options.add_argument("--window-size=1920,1080")
-        # Security-relevant options
-        chrome_options.add_argument("--disable-web-security")
-        chrome_options.add_argument("--allow-running-insecure-content")
-        chrome_options.add_argument("--disable-blink-features=AutomationControlled")
-        chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+        browser = cls.BROWSER
+        cls.logger.info(f"Using browser: {browser}")
 
         try:
-            # Try custom paths first, then fall back to auto-detection
-            chromedriver_path = os.getenv("CHROMEDRIVER")
-            chrome_binary = os.getenv("CHROME_BIN")
-            
-            # If no custom binary specified, try common locations
-            if not chrome_binary:
-                common_paths = [
-                    "/usr/bin/chromium-browser",      # Linux (Chromium)
-                    "/usr/bin/chromium",              # Linux (Chromium alt)
-                    "/usr/bin/google-chrome",         # Linux (Google Chrome)
-                    "/usr/bin/google-chrome-stable",  # Linux (Google Chrome stable)
-                    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",  # macOS
-                    "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",     # Windows
-                ]
-                for path in common_paths:
-                    if os.path.exists(path):
-                        chrome_binary = path
-                        cls.logger.info(f"Using Chrome binary: {chrome_binary}")
-                        break
-            
-            if chrome_binary:
-                chrome_options.binary_location = chrome_binary
-            
-            if chromedriver_path and os.path.exists(chromedriver_path):
-                cls.driver = webdriver.Chrome(service=Service(chromedriver_path), options=chrome_options)
+            if browser in ("chrome", "chromium"):
+                chrome_options = ChromeOptions()
+                if cls.HEADLESS:
+                    chrome_options.add_argument("--headless=new")
+                chrome_options.add_argument("--no-sandbox")
+                chrome_options.add_argument("--disable-dev-shm-usage")
+                chrome_options.add_argument("--disable-gpu")
+                chrome_options.add_argument("--window-size=1920,1080")
+                # Security-relevant options
+                chrome_options.add_argument("--disable-web-security")
+                chrome_options.add_argument("--allow-running-insecure-content")
+                chrome_options.add_argument("--disable-blink-features=AutomationControlled")
+                chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+
+                chromedriver_path = os.getenv("CHROMEDRIVER")
+                chrome_binary = os.getenv("CHROME_BIN")
+
+                if not chrome_binary:
+                    common_paths = [
+                        "/usr/bin/chromium-browser",      # Linux (Chromium)
+                        "/usr/bin/chromium",              # Linux (Chromium alt)
+                        "/usr/bin/google-chrome",         # Linux (Google Chrome)
+                        "/usr/bin/google-chrome-stable",  # Linux (Google Chrome stable)
+                        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",  # macOS
+                        "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",     # Windows
+                    ]
+                    for path in common_paths:
+                        if os.path.exists(path):
+                            chrome_binary = path
+                            cls.logger.info(f"Using Chrome binary: {chrome_binary}")
+                            break
+
+                if chrome_binary:
+                    chrome_options.binary_location = chrome_binary
+
+                if chromedriver_path and os.path.exists(chromedriver_path):
+                    cls.driver = webdriver.Chrome(
+                        service=ChromeService(chromedriver_path),
+                        options=chrome_options,
+                    )
+                else:
+                    cls.driver = webdriver.Chrome(options=chrome_options)
+
+            elif browser == "firefox":
+                firefox_options = FirefoxOptions()
+                if cls.HEADLESS:
+                    firefox_options.add_argument("-headless")
+                firefox_options.set_preference("dom.disable_beforeunload", True)
+
+                geckodriver_path = os.getenv("GECKODRIVER")
+                firefox_binary = os.getenv("FIREFOX_BIN")
+
+                if firefox_binary:
+                    firefox_options.binary_location = firefox_binary
+
+                if geckodriver_path and os.path.exists(geckodriver_path):
+                    cls.driver = webdriver.Firefox(
+                        service=FirefoxService(geckodriver_path),
+                        options=firefox_options,
+                    )
+                else:
+                    cls.driver = webdriver.Firefox(options=firefox_options)
+
+            elif browser == "edge":
+                edge_options = EdgeOptions()
+                if cls.HEADLESS:
+                    edge_options.add_argument("--headless=new")
+                edge_options.add_argument("--no-sandbox")
+                edge_options.add_argument("--disable-dev-shm-usage")
+                edge_options.add_argument("--disable-gpu")
+                edge_options.add_argument("--window-size=1920,1080")
+
+                edgedriver_path = os.getenv("EDGEDRIVER")
+                edge_binary = os.getenv("EDGE_BIN")
+
+                if edge_binary:
+                    edge_options.binary_location = edge_binary
+
+                if edgedriver_path and os.path.exists(edgedriver_path):
+                    cls.driver = webdriver.Edge(
+                        service=EdgeService(edgedriver_path),
+                        options=edge_options,
+                    )
+                else:
+                    cls.driver = webdriver.Edge(options=edge_options)
+
             else:
-                cls.driver = webdriver.Chrome(options=chrome_options)
-            
+                raise ValueError(
+                    f"Unsupported browser '{browser}'. Use one of: chrome, chromium, firefox, edge"
+                )
+
             cls.driver.set_page_load_timeout(cls.TIMEOUT)
             cls.wait = WebDriverWait(cls.driver, cls.TIMEOUT)
             cls.logger.info("WebDriver initialized successfully")
@@ -175,9 +233,9 @@ class BaseSecurityTest(unittest.TestCase):
             "return Object.fromEntries(new Headers(performance.getEntriesByType('navigation')[0]?.responseHeaders || []));"
         )
 
-    def _inject_script(self, script: str) -> any:
+    def _inject_script(self, script: str, *args) -> any:
         """Execute JavaScript and return result."""
-        return self.driver.execute_script(script)
+        return self.driver.execute_script(script, *args)
 
     def _find_element_safe(self, by: By, value: str):
         """Find element without raising exception."""

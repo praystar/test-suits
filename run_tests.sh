@@ -12,6 +12,7 @@ cd "$SCRIPT_DIR"
 TARGET_URL="${TARGET_URL:-http://localhost:8080}"
 TEST_SUITE="${1:-all}"
 HEADLESS="${HEADLESS:-true}"
+BROWSER="${BROWSER:-chrome}"
 REPORT_DIR="reports"
 VENV_DIR=".venv"
 
@@ -36,6 +37,7 @@ echo -e "${NC}"
 log "Target URL : ${TARGET_URL}"
 log "Test Suite : ${TEST_SUITE}"
 log "Headless   : ${HEADLESS}"
+log "Browser    : ${BROWSER}"
 
 # Setup virtual environment
 if [ ! -d "$VENV_DIR" ]; then
@@ -73,7 +75,7 @@ case "$TEST_SUITE" in
     all|*)        TEST_PATHS="security_tests/" ;;
 esac
 
-export TARGET_URL HEADLESS
+export TARGET_URL HEADLESS BROWSER
 
 # Dry-run collection to surface import errors
 log "Collecting tests..."

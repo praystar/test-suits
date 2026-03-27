@@ -240,6 +240,13 @@ open http://localhost:8080
 bash run_tests.sh all
 ```
 
+**Run with a specific browser:**
+```bash
+BROWSER="chrome" bash run_tests.sh all
+BROWSER="firefox" bash run_tests.sh all
+BROWSER="edge" bash run_tests.sh all
+```
+
 **Run specific test suite:**
 ```bash
 bash run_tests.sh xss              # XSS tests only
@@ -489,12 +496,19 @@ export TARGET_URL="https://your-app.com"
 # Run in GUI mode (not headless)
 export HEADLESS="false"
 
+# Choose browser: chrome, chromium, firefox, edge
+export BROWSER="firefox"
+
 # Custom timeouts
 export SELENIUM_TIMEOUT="20"
 
-# Custom paths for Chrome
+# Custom paths for browser binaries/drivers
 export CHROME_BIN="/usr/bin/chromium-browser"
 export CHROMEDRIVER="/usr/bin/chromedriver"
+export FIREFOX_BIN="/usr/bin/firefox"
+export GECKODRIVER="/usr/bin/geckodriver"
+export EDGE_BIN="/usr/bin/microsoft-edge"
+export EDGEDRIVER="/usr/bin/msedgedriver"
 ```
 
 ---
